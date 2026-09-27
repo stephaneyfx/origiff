@@ -36,7 +36,7 @@
           src = freeze-font-src;
           buildAndTestSubdir = "freeze-font-cli";
         };
-        version = "0.1";
+        version = "0.2";
         makeKebab = strings:
           pkgs.lib.concatMapStringsSep "-" pkgs.lib.toLower (pkgs.lib.concatMap (pkgs.lib.splitString " ") strings);
         runFreezeFont = { originPath, originName, family, subfamily, features }:
@@ -54,44 +54,52 @@
               --description '${originName} with some opentype features frozen' \
               --out $out/share/fonts/opentype/${kebabName}.otf
           '';
-        installRegular = runFreezeFont {
-          originPath = "${source-sans}/VF/SourceSans3VF-Upright.otf";
-          originName = "Source Sans 3 Regular";
+        weights = [
+          "ExtraLight"
+          "Light"
+          "Normal"
+          "Medium"
+          "Semibold"
+          "Bold"
+          "Black"
+        ];
+        slants = ["Regular" "Italic"];
+        makeInstall = { dir, originName, family, features }: slant: weight:
+          let
+            filenameSlant = if slant == "Italic" then "It" else slant;
+            filenameSuffix =
+              if weight == "Normal" then filenameSlant
+              else if slant == "Regular" then weight
+              else "${weight}${filenameSlant}";
+            baseFilename = pkgs.lib.replaceString " " "" originName;
+            originPath = "${dir}/${baseFilename}-${filenameSuffix}.otf";
+          in runFreezeFont {
+            inherit family originPath;
+            originName = "${originName} ${slant}";
+            subfamily = "${slant} ${weight}";
+            features = features slant;
+          };
+        install = args: pkgs.lib.crossLists (makeInstall args) [slants weights];
+        installSans = install {
+          dir = "${source-sans}/OTF";
+          originName = "Source Sans 3";
           family = "Origiff";
-          subfamily = "Regular";
-          features = ["cv01" "cv03"];
+          features = slant: if slant == "Regular" then ["cv01" "cv03"] else ["cv01" "cv02"];
         };
-        installItalic = runFreezeFont {
-          originPath = "${source-sans}/VF/SourceSans3VF-Italic.otf";
-          originName = "Source Sans 3 Italic";
-          family = "Origiff";
-          subfamily = "Italic";
-          features = ["cv01" "cv02"];
-        };
-        installCodeRegular = runFreezeFont {
-          originPath = "${source-code}/VF/SourceCodeVF-Upright.otf";
-          originName = "Source Code Pro Regular";
+        installCode = install {
+          dir = "${source-code}/OTF";
+          originName = "Source Code Pro";
           family = "Origiff Code";
-          subfamily = "Regular";
-          features = ["cv02"];
+          features = slant: if slant == "Regular" then ["cv02"] else ["cv01"];
         };
-        installCodeItalic = runFreezeFont {
-          originPath = "${source-code}/VF/SourceCodeVF-Italic.otf";
-          originName = "Source Code Pro Italic";
-          family = "Origiff Code";
-          subfamily = "Italic";
-          features = ["cv01"];
-        };
+        installAll = pkgs.lib.concatMapStringsSep "\n" toString (installSans ++ installCode);
         origiff = pkgs.stdenv.mkDerivation {
           inherit version;
           pname = "origiff";
           src = self;
           installPhase = ''
             mkdir -p $out/share/fonts/opentype
-            ${installRegular}
-            ${installItalic}
-            ${installCodeRegular}
-            ${installCodeItalic}
+            ${installAll}
           '';
           meta = {
             description = "Origiff fonts";
