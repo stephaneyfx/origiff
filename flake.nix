@@ -39,10 +39,24 @@
         version = "0.2";
         makeKebab = strings:
           pkgs.lib.concatMapStringsSep "-" pkgs.lib.toLower (pkgs.lib.concatMap (pkgs.lib.splitString " ") strings);
-        runFreezeFont = { originPath, originName, family, subfamily, features }:
+        runFreezeFont = {
+          originPath,
+          originName,
+          family,
+          subfamily,
+          typographicFamily ? "",
+          typographicSubfamily ? "",
+          features,
+        }:
           let
             postscriptName = pkgs.lib.concatMapStrings (pkgs.lib.replaceString " " "") [family subfamily];
             kebabName = makeKebab [family subfamily];
+            typographicFamilyArg =
+              if typographicFamily == "" then ""
+              else ''--typographic-family "${typographicFamily}"'';
+            typographicSubfamilyArg =
+              if typographicSubfamily == "" then ""
+              else ''--typographic-subfamily "${typographicSubfamily}"'';
           in ''
             ${freeze-font}/bin/freeze-font --path '${originPath}' freeze \
               --exclude-platform macintosh --clean-names \
@@ -51,6 +65,7 @@
               --family '${family}' --subfamily '${subfamily}' --uid ${kebabName}-${version} \
               --full-name '${family} ${subfamily}' --version ${version} \
               --postscript-name ${postscriptName} \
+              ${typographicFamilyArg} ${typographicSubfamilyArg} \
               --description '${originName} with some opentype features frozen' \
               --out $out/share/fonts/opentype/${kebabName}.otf
           '';
@@ -80,10 +95,12 @@
                 if slant == "Regular" then weight else "${weight} ${slant}"
               else
                 slant;
+            typographicSubfamily = if weight == "Normal" then slant else "${weight} ${slant}";
           in runFreezeFont {
-            inherit originPath subfamily;
+            inherit originPath subfamily typographicSubfamily;
             originName = "${originName} ${slant}";
             family = finalFamily;
+            typographicFamily = family;
             features = features slant;
           };
         install = args: pkgs.lib.crossLists (makeInstall args) [slants weights];
