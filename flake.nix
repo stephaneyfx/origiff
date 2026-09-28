@@ -73,10 +73,17 @@
               else "${weight}${filenameSlant}";
             baseFilename = pkgs.lib.replaceString " " "" originName;
             originPath = "${dir}/${baseFilename}-${filenameSuffix}.otf";
+            finalFamily =
+              if weight == "Normal" || weight == "Bold" then family else  "${family} ${weight}";
+            subfamily =
+              if weight == "Bold" then
+                if slant == "Regular" then weight else "${weight} ${slant}"
+              else
+                slant;
           in runFreezeFont {
-            inherit family originPath;
+            inherit originPath subfamily;
             originName = "${originName} ${slant}";
-            subfamily = "${slant} ${weight}";
+            family = finalFamily;
             features = features slant;
           };
         install = args: pkgs.lib.crossLists (makeInstall args) [slants weights];
